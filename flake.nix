@@ -18,6 +18,10 @@
   outputs = inputs@{ self, flake-parts, ... }:
     flake-parts.lib.mkFlake { inherit inputs; } {
       systems = [
+        "aarch64-darwin"
+        "aarch64-linux"
+        "i686-linux"
+        # "x86_64-darwin" # TODO: cbmc on x86_64-darwin is marked as broken
         "x86_64-linux"
       ];
       perSystem = { config, system, pkgs, ... }: {
@@ -40,7 +44,7 @@
               owner = "model-checking";
               repo = pname;
               rev = "viewer-${version}";
-              hash = "sha256-+s5RBC3XSgb8omTbUNLywZnP6jSxZBKSS1BmXOjRF8M=";
+              hash = "sha256-t3lR09ZUgyXe/p/dcmA3nIiDeFcmIEpTJtDZnC+n/Mw=";
               fetchSubmodules = true;
             };
 
@@ -49,35 +53,34 @@
               jinja2
               voluptuous
             ];
-
-            # for dev TODO:
-            buildPhase = ''
-              echo "Contents of source directory:"
-              ls -la
-              cat README.md
-              # Now call the default pypa build phase
-              pypaBuildPhase
-            '';
           };
 
-          kani-verifier = pkgs.rustPlatform.buildRustPackage rec {
+          kani-verifier = let
+              rustPlatform = pkgs.makeRustPlatform {
+                cargo = pkgs.rust-bin.selectLatestNightlyWith (toolchain: toolchain.default);
+                rustc = pkgs.rust-bin.selectLatestNightlyWith (toolchain: toolchain.default);
+              };
+            in rustPlatform.buildRustPackage rec {
             pname = "kani-verifier";
             version = "0.56.0";
 
-            buildInputs = with pkgs; [ kissat cbmc ] ++ [ cbmc-viewer ];
+            nativeBuildInputs = with pkgs; [ kissat cbmc rustup ] ++ [ cbmc-viewer ];
 
             src = pkgs.fetchFromGitHub {
               owner = "model-checking";
               repo = "kani";
               rev = "kani-${version}";
-              hash = "sha256-+s5RBC3XSgb8omTbUNLywZnP6jSxZBKSS1BmXOjRF8M=";
+              hash = "sha256-O4zNkhpI0lFFomFzExBnM5y4Rj0Sm5CgQyw6cqek6Pg=";
               fetchSubmodules = true;
             };
 
-            cargoHash = pkgs.lib.fakeHash;
+            cargoHash = "sha256-chIZp0JOzchMz2CY4pWFXfzRnW0sftw2TKvaFQtVqAc=";
 
             # ref: https://github.com/model-checking/kani/blob/52fcc6cc747779c31ba41593b0d0777043540264/.github/actions/build-bundle/action.yml
             buildPhase = ''
+              export RUSTUP_TOOLCHAIN=nightly
+              export CARGO_HOME=$PWD/.cargo
+              export RUSTUP_HOME=$PWD/.rustup
               cargo bundle -- ${version}
             '';
 
